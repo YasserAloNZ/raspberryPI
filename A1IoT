@@ -1,0 +1,52 @@
+import time
+import paho.mqtt as mqtt
+import serial
+
+client = mqtt.client.Client()
+port = serial.Serial("/dev/ttyAMA0", 9600)
+
+client.on_connect = {"on_connect"}
+client.on_message = {"on_message"}
+client.connect("broker.hivemq.com" , 1883)
+
+
+port.write(b'\x68\x01\x01\x96')
+data = port.read(32)
+pm10 = data [4,5]
+pm25 = data [6,7]
+client.publish(pm10, "A1/iot")
+client.publish(pm25, "A1/iot")
+port.close()
+
+def main():
+    if port.isOpen():
+        port.close()
+    port.open()
+    time.sleep(0.2)
+    try:
+        data = port.read(32);
+        if ord(data[0]) == 66 and ord(data[1]) == 77:
+            suma = 0
+            for a in range(30):
+                suma += ord(data[a])
+            if suma == ord(data[30])*256+ord(data[31]):
+                PM25 = int(ord(data[6])*256+ord(data[7]))
+                PM10 = int((ord(data[8])*256+ord(data[9]))/0.75)
+                print('PM2.5: {} ug/m3'.format(PM25))
+                print('PM10: {} ug/m3'.format(PM10))
+                datetime = strftime("%Y-%m-%d %H:%M:%S", localtime())
+                dataPublish = "PM10: {}, PM25: {}, time: {}".format(PM10, PM25, datetime)
+                client.publish( "A1/iot", qos = 1)
+            else:
+              print("no data")
+        else:
+            print("no data")
+    except Exception as ex:
+        print(ex)
+    finally:
+        port.close()
+
+if __name__=="__main__":
+    for a in range(35):
+        main()
+        time.sleep(0.2)
